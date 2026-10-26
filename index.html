@@ -100,7 +100,7 @@
  function id(){return(globalThis.crypto&&crypto.randomUUID)?crypto.randomUUID():String(Date.now())+'-'+Math.random().toString(36).slice(2)}
  function editRecord(r){goto('register');$('editId').value=r.id;autoTime=false;$('date').value=r.datetime;updateDateHint();$('merchant').value=r.merchant;$('amount').value=(r.amount/100).toFixed(2).replace('.',',');$('pocket').value=r.pocket;$('source').value=r.source;$('description').value=r.description||'';$('saveBtn').textContent='Guardar cambios';$('cancelEdit').style.display='inline-block';$('formMsg').textContent='Modificando una compra existente.'}
  function saveFile(name,body,type){const url=URL.createObjectURL(new Blob([body],{type}));const link=document.createElement('a');link.href=url;link.download=name;document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),10000)}
- const csv=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+ const csv=v=>{let t=String(v??'');if(/^[\s\uFEFF]*[=+@-]/.test(t))t="'"+t;return '"'+t.replace(/"/g,'""')+'"'};
  function copy(s,msg){if(navigator.clipboard?.writeText){navigator.clipboard.writeText(s).then(()=>showMsg(msg,'Copiado.')).catch(()=>fallbackCopy(s,msg))}else fallbackCopy(s,msg)}
  function fallbackCopy(s,msg){const a=document.createElement('textarea');a.value=s;document.body.appendChild(a);a.select();try{document.execCommand('copy');showMsg(msg,'Copiado.')}catch(e){showMsg(msg,'No se pudo copiar; usa Exportar TXT.',true)}a.remove()}
  function plan(){const p={};for(const r of db.records.filter(x=>x.status!=='moved'))p[r.pocket]=(p[r.pocket]||0)+r.amount;const lines=Object.entries(p).sort((a,b)=>b[1]-a[1]).map(([p,n])=>`Mover de ${p} → AMEX: ${fmt(n)}`);return ['AMEX · Transferencias pendientes',...lines,`TOTAL: ${fmt(totals().pending)}`,'Importes a transferir manualmente en Revolut.'].join('\n')}
@@ -122,7 +122,7 @@
  $('exportText').addEventListener('click',()=>saveFile('AMEX-historial.txt',textLog(),'text/plain;charset=utf-8'));$('importText').addEventListener('click',importOld);$('jsonImport').addEventListener('change',e=>restoreJson(e.target.files[0]));
  $('savePockets').addEventListener('click',()=>{const names=[...new Set($('pocketSettings').value.split(/\r?\n/).map(cleanPocket).filter(Boolean))];if(!names.length){showMsg('settingsMsg','Debe existir al menos un bolsillo.',true);return}for(const r of db.records)if(!names.includes(r.pocket))names.push(r.pocket);db.pockets=names;for(const [key,val] of Object.entries(db.rules))if(!names.includes(val))delete db.rules[key];persist();renderPockets();render();showMsg('settingsMsg','Bolsillos guardados. Los utilizados en transacciones antiguas se mantienen.')});
  load();renderPockets();clearForm();$('monthSummary').value=nowLocal().slice(0,7);$('amexBalance').value=db.balances.amex||'';$('revolutBalance').value=db.balances.revolut||'';render();if(location.protocol==='file:')$('fileWarning').style.display='block';
- const params=new URLSearchParams(location.search);const payload=params.get('texto')||params.get('prefill');if(payload){$('raw').value=payload;$('prefillDetails').open=true;prefill(infer(payload));history.replaceState(null,'',location.pathname)}
+ // Privacidad: no se admiten movimientos financieros mediante parámetros URL.
  if('serviceWorker' in navigator&&/^https?:$/.test(location.protocol))window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
 })();
 </script>

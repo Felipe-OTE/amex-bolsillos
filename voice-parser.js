@@ -185,8 +185,18 @@ function parse(text,opts={}){
   if(k==='imprevisto'||k==='imprevistos')aliases.push('imprevu','imprevus');
   return aliases.some(a=>(' '+normalized+' ').includes(' '+a+' '));
  }).sort((a,b)=>b.length-a.length);
- const pocketWasMentioned=/\b(?:bolsillo|pocket|poches?|cat[eé]gorie|categor[ií]a|enveloppe)\b/i.test(raw);
+ const pocketLabel=/(?:^|\s)(?:bolsillo|pocket|poches?|categorie|categoria|enveloppe)\b/;
+ const pocketWasMentioned=pocketLabel.test(normalized);
  let pocket=matches.length?matches[0]:'';
+ // Se limitan transcripciones fonéticas de «Loisirs» a un bolsillo explícitamente dictado.
+ if(!pocket && pocketWasMentioned){
+   const label=normalized.match(pocketLabel);
+   const rawTail=label?normalized.slice(label.index+label[0].length):'';
+   const tail=rawTail.replace(/^[\s,.:;–-]+/,'').split(/\b(?:motivo|motif|descripcion|description|nota|note|comercio|commerce|merchant|importe|monto)\b/)[0].trim();
+   const alias=/^(?:lo\s+hacia|los?\s+sir+r?|lo\s+si(?:\s+u)?|los?\s+si(?:\s+u)?|lo\s+cir+r?|lo\s+zis|losir+|loisir+s?|losiers?)\b/;
+   const loisirsName=pocketNames.find(p=>key(p)==='loisirs');
+   if(loisirsName && alias.test(tail))pocket=loisirsName;
+ }
  // Si se dictó explícitamente «bolsillo» pero el reconocimiento fue incorrecto,
  // NO asignar otro bolsillo por la regla habitual del comercio.
  if(!pocket&&!pocketWasMentioned&&found.name&&opts.rules)pocket=opts.rules[key(found.name)]||'';

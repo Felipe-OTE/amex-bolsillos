@@ -53,7 +53,7 @@ function merchantFor(raw,options){
  if(ranked.length)return {name:ranked[0].name,matched:true};
  const rx=/\b(?:en|chez|at|comercio|tienda|magasin)\s+([\p{L}\p{N}][\p{L}\p{N}\s.'&-]{1,60})/iu;
  const m=raw.match(rx);
- if(m){let value=m[1].split(/\b(?:por|pour|de|con|avec|cost[oó]|cargad[oa]s?|pagad[oa]s?|pagu[eé]|paye|payé|importe|total|fueron|fue|euros?|relai|swile|amex)\b/iu)[0].replace(/[\s,.;]+$/,'').trim();if(value.length>=2)return{name:value,matched:false}}
+ if(m){let value=m[1].split(/[,;.]|\b(?:bolsillo|pocket|desde|depuis|description|descripci[oó]n|nota|note|por|pour|de|con|avec|cost[oó]|cargad[oa]s?|pagad[oa]s?|pagu[eé]|paye|payé|importe|total|fueron|fue|euros?|relai|swile|amex)\b/iu)[0].replace(/[\s,.;]+$/,'').trim();if(value.length>=2)return{name:value,matched:false}}
  return{name:'',matched:false};
 }
 function expandSpokenCents(text){

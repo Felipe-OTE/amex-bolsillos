@@ -81,6 +81,7 @@
  let db={records:[],pockets:defaults.slice(),rules:{},balances:{amex:'',revolut:''},merchants:[]};
   let merchantVisible=[],merchantHighlighted=-1;
  let autoTime=true;
+ let voiceDraft=null;
  const $=id=>document.getElementById(id);
  const fmt=n=>(Number(n||0)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
  const esc=v=>String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
@@ -115,6 +116,30 @@
  function renderDifference(){const a=asCents($('amexBalance').value),r=asCents($('revolutBalance').value);$('balanceDiff').textContent=a===null||r===null?'—':fmt(a-r);$('balanceDiff').style.color=a!==null&&r!==null&&a-r>0?'var(--red)':'var(--ink)'}
  function goto(tab){if(tab==='register'&&autoTime&&!$('editId').value)$('date').value=nowLocal();document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('active',x.id===tab));window.scrollTo({top:0,behavior:'smooth'})}
  function pocketFor(merchant){return db.rules[normalize(merchant)]||''}
+ function voiceMoney(cents){return cents===null||cents===undefined?'No indicado':fmt(cents)}
+ function analyzeVoice(){
+   const raw=$('voiceTranscript').value.trim();
+   if(!window.AmexVoiceParser){showMsg('voiceMessage','Intérprete no disponible. Recarga la página.',true);return}
+   voiceDraft=window.AmexVoiceParser.parse(raw,{merchants:frequentMerchants().map(x=>x.name),pockets:db.pockets,rules:db.rules});
+   for(const [field,value] of [['voiceMerchant',voiceDraft.merchant||'Por identificar'],['voiceAmount',voiceMoney(voiceDraft.amount)],['voiceSource',voiceDraft.source==='Swile relais'?'Swile → AMEX relais':'AMEX directa'],['voicePocket',voiceDraft.pocket||'Por seleccionar'],['voiceSwileAmount',voiceMoney(voiceDraft.swilePaid)],['voicePurchaseTotal',voiceMoney(voiceDraft.purchaseTotal)]])$(field).textContent=value;
+   $('voiceWarnings').hidden=!voiceDraft.warnings.length;
+   $('voiceWarnings').textContent=voiceDraft.warnings.join('\n');
+   $('voiceApply').disabled=!voiceDraft.canApply;
+   $('voiceReview').hidden=false;
+   showMsg('voiceMessage',voiceDraft.canApply?'Interpretación preparada. Revisa la información.':'Faltan datos o hay ambigüedad: corrige el dictado y vuelve a analizar.',!voiceDraft.canApply);
+ }
+ function applyVoice(){
+   if(!voiceDraft?.canApply)return;
+   $('merchant').value=voiceDraft.merchant;
+   $('amount').value=(voiceDraft.amount/100).toFixed(2).replace('.',',');
+   $('source').value=voiceDraft.source==='Swile relais'?'Swile relais':'AMEX';
+   const suggested=voiceDraft.pocket||pocketFor(voiceDraft.merchant);
+   if(suggested&&db.pockets.includes(suggested))$('pocket').value=suggested;
+   else $('pocket').value='';
+   $('voiceReview').hidden=true;closeMerchantList();
+   showMsg('formMsg','Dictado aplicado. Confirma el comercio, el importe cargado a AMEX, el bolsillo y el tipo de pago antes de guardar.');
+   $('amount').focus();
+ }
  function parseHistory(line){const parts=line.split('|').map(s=>s.trim());if(parts.length<4)return null;const d=parts[0].match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?$/);if(!d)return null;const amount=asCents(parts[2]);if(amount===null||amount<0||!parts[1])return null;const explicitStatus=parts.length>=6&&/^(TRANSFERIDO|PENDIENTE)$/i.test(parts[5]);return{datetime:`${d[3]}-${d[2]}-${d[1]}T${d[4]||'12'}:${d[5]||'00'}`,merchant:parts[1],amount,pocket:cleanPocket(parts[3]),description:explicitStatus?parts[4]:parts.slice(4).join(' | '),source:explicitStatus&&parts[6]==='Swile relais'?'Swile relais':'AMEX',status:explicitStatus&&/^TRANSFERIDO$/i.test(parts[5])?'moved':'pending',_statusExplicit:explicitStatus}}
  function infer(raw){const text=String(raw||'').trim();if(!text)return null;const first=text.split(/\r?\n/).find(x=>x.trim())||'';const parsed=parseHistory(first);if(parsed)return parsed;
   let m=text.match(/(?:^|\s)(?:EUR|€)\s*([0-9][0-9.,\s]*)/i)||text.match(/([0-9][0-9.,\s]*)\s*(?:€|EUR)/i);const amt=m?asCents(m[1]):null;
@@ -147,6 +172,11 @@
  $('parseBtn').addEventListener('click',()=>prefill(infer($('raw').value)));$('exampleBtn').addEventListener('click',()=>{$('raw').value='01/01/2026 12:00 | Tienda de ejemplo | 9,99 € | Alimentación | Ejemplo ficticio';prefill(infer($('raw').value))});
  $('date').addEventListener('input',()=>{autoTime=false;updateDateHint()});
  $('nowBtn').addEventListener('click',resetDateToNow);
+ $('voiceFocus').addEventListener('click',()=>{$('voiceTranscript').focus();showMsg('voiceMessage','Usa el micrófono del teclado del iPhone; después pulsa «Interpretar gasto».')});
+ $('voiceAnalyze').addEventListener('click',analyzeVoice);
+ $('voiceExample').addEventListener('click',()=>{$('voiceTranscript').value='4 euros cargados con Swile Relais en Lidl, bolsillo Alimentación';analyzeVoice()});
+ $('voiceApply').addEventListener('click',applyVoice);
+ $('voiceDiscard').addEventListener('click',()=>{voiceDraft=null;$('voiceReview').hidden=true;showMsg('voiceMessage','Borrador descartado. No se guardó ningún movimiento.')});
  $('entryForm').addEventListener('submit',saveRecord);$('cancelEdit').addEventListener('click',clearForm);
   $('merchant').addEventListener('focus',()=>renderMerchantOptions());
   $('merchant').addEventListener('input',()=>{renderMerchantOptions();suggestPocket()});

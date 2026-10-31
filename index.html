@@ -35,7 +35,7 @@
     <div class="card"><h2>Registrar una compra</h2>
 <div class="voice-card" id="voiceCard"><h3>🎙 Registrar gasto por voz <span class="tiny">· prueba v1.3</span></h3>
 <p class="hint" style="margin:0 0 9px">Toca «Dictar» y usa el micrófono del teclado del iPhone. Habla en español o francés; podrás corregir el texto antes del análisis.</p>
-<div class="voice-notice"><strong>Entorno de prueba externo:</strong> utiliza únicamente datos ficticios. No importes respaldos ni movimientos financieros reales aquí.</div>
+<div class="voice-notice"><strong>Entorno de prueba externo:</strong> utiliza solo datos ficticios. No se guardan movimientos permanentemente; se borran al recargar. Nunca importes respaldos reales.</div>
 <div class="field"><label for="voiceTranscript">Texto dictado</label><textarea id="voiceTranscript" rows="3" lang="es" autocomplete="off" autocorrect="on" placeholder="Ej.: 4 euros cargados con Swile Relais en Tienda Ejemplo, bolsillo Alimentación"></textarea></div>
 <div class="btns voice-buttons"><button type="button" class="btn soft" id="voiceFocus">🎙 Dictar</button><button type="button" class="btn primary" id="voiceAnalyze">Interpretar gasto</button><button type="button" class="btn" id="voiceExample">Ejemplo ficticio</button></div>
 <div id="voiceMessage" class="tiny" style="margin-top:7px" role="status"></div>
@@ -71,12 +71,13 @@
      <div class="card"><h2>Configurar bolsillos</h2><p class="hint" style="margin:-7px 0 13px">Un bolsillo por línea. «Cours Danse» se excluye siempre porque no participa en los pagos AMEX.</p><div class="field"><label for="pocketSettings">Bolsillos de origen</label><textarea id="pocketSettings" rows="7"></textarea></div><button id="savePockets" class="btn">Guardar bolsillos</button><div id="settingsMsg" class="msg" role="status"></div></div>
     <div class="card"><h2>Privacidad y seguridad</h2><div class="tiny">Sin Google Analytics, anuncios, bibliotecas externas, APIs de bancos ni cuentas. El dinero no se mueve automáticamente; esta es una herramienta de registro. No introduce números de tarjeta ni credenciales. Guarda los respaldos en un lugar seguro y evita borrar los datos de la web app sin exportarlos.</div></div>
   </section>
-  <div class="footer">AMEX Bolsillos · Versión 1.3 prueba · Local-first · No afiliada a AMEX ni Revolut</div>
+  <div class="footer">AMEX Bolsillos · Versión 1.3 DEMO · No guarda datos · No afiliada a AMEX ni Revolut</div>
 </main>
 <script src="./voice-parser.js"></script>
 <script>
 (()=>{'use strict';
  const KEY='amex-bolsillos-v1';
+ const DEMO_MODE=true; // Solo esta rama: los movimientos NO se leen ni escriben en localStorage.
  const defaults=['Alimentación','Loisirs','Lille','Imprevisto','Cuenta EUR','Ahorros'];
  let db={records:[],pockets:defaults.slice(),rules:{},balances:{amex:'',revolut:''},merchants:[]};
   let merchantVisible=[],merchantHighlighted=-1;
@@ -88,8 +89,8 @@
  const normalize=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
  const nowLocal=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`};
  const asCents=s=>{let a=String(s??'').replace(/(?:EUR|USD)/ig,'').replace(/[\s\u00a0\u202f€$]/g,'').trim();if(!a)return null;if(!/^[-+]?\d[\d.,]*$/.test(a))return null;const c=a.lastIndexOf(','),d=a.lastIndexOf('.');if(c>=0&&d>=0){const dec=Math.max(c,d);a=a.replace(/[.,]/g,(ch,i)=>i===dec?'.':'');}else if(c>=0){const frac=a.length-c-1;a=frac===3&&c>0?a.replace(/,/g,''):a.replace(',','.')}else if(d>=0){const frac=a.length-d-1;if(frac===3&&d>0)a=a.replace(/\./g,'')}const n=Number(a);return Number.isFinite(n)?Math.round(n*100):null};
- function load(){try{const o=JSON.parse(localStorage.getItem(KEY)||'null');if(o&&typeof o==='object'){db={...db,...o};if(!Array.isArray(db.records))db.records=[];if(!Array.isArray(db.pockets))db.pockets=defaults.slice();if(!db.rules||typeof db.rules!=='object')db.rules={};if(!db.balances)db.balances={amex:'',revolut:''};db.merchants=uniqueMerchants(db.merchants);}}catch(e){alert('No se pudieron leer los datos. No se sobrescribirán hasta que guardes un cambio. Exporta una copia desde el navegador si es posible.');}}
- function persist(){try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch(e){alert('No se pudo guardar en este navegador. Exporta un respaldo y comprueba el espacio disponible.');return false}}
+ function load(){if(DEMO_MODE)return;try{const o=JSON.parse(localStorage.getItem(KEY)||'null');if(o&&typeof o==='object'){db={...db,...o};if(!Array.isArray(db.records))db.records=[];if(!Array.isArray(db.pockets))db.pockets=defaults.slice();if(!db.rules||typeof db.rules!=='object')db.rules={};if(!db.balances)db.balances={amex:'',revolut:''};db.merchants=uniqueMerchants(db.merchants);}}catch(e){alert('No se pudieron leer los datos. No se sobrescribirán hasta que guardes un cambio. Exporta una copia desde el navegador si es posible.');}}
+ function persist(){if(DEMO_MODE)return true;try{localStorage.setItem(KEY,JSON.stringify(db));return true}catch(e){alert('No se pudo guardar en este navegador. Exporta un respaldo y comprueba el espacio disponible.');return false}}
  function cleanPocket(s){return String(s||'').trim().toLowerCase()==='cours danse'?'':String(s||'').trim()};
   function cleanMerchant(s){return String(s||'').trim().replace(/\s+/g,' ').slice(0,100)}
   function isPaymentProvider(s){const n=normalize(s);return n==='swile'||n.startsWith('cko swile')}

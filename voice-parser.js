@@ -205,7 +205,7 @@ function parse(text,opts={}){
  const description=descriptionFor(raw);
  const invalid=warnings.some(x=>/varios importes|varios totales|total no coincide|supera el total|no se identifico con certeza/i.test(key(x)));
  const canApply=!!found.name&&amount!==null&&amount>0&&!invalid;
- return {merchant:found.name,matchedMerchant:found.matched,amount,source:source||'AMEX',pocket,description,swilePaid,purchaseTotal,warnings,canApply,ambiguous:!canApply,transcript:raw};
+ return {merchant:found.name,matchedMerchant:found.matched,amount,source:source||'AMEX',pocket,pocketMentioned:pocketWasMentioned,description,swilePaid,purchaseTotal,warnings,canApply,ambiguous:!canApply,transcript:raw};
 }
 root.AmexVoiceParser=Object.freeze({parse,version:'1.3'});
 })(window);

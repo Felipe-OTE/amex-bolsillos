@@ -40,20 +40,30 @@ function amounts(text){
  return found.sort((a,b)=>a.start-b.start);
 }
 function merchantFor(raw,options){
- const optionsNames=Array.isArray(options)?options.filter(x=>typeof x==='string').map(x=>x.trim()).filter(Boolean):[];
- const n=key(raw), ranked=[];
- for(const name of optionsNames){
-   const possibilities=[name,...name.split(/\s*\/\s*/)];
-   for(const alias of possibilities){
-     const v=key(alias);if(!v || v.length<3)continue;
-     if((' '+n+' ').includes(' '+v+' '))ranked.push({name,score:v.length});
-   }
+ const names=Array.isArray(options)?options.filter(x=>typeof x==='string').map(x=>x.trim()).filter(Boolean):[];
+ const n=key(raw),ranked=[];
+ for(const name of names)for(const alias of [name,...name.split(/\s*\/\s*/)]){
+   const v=key(alias);
+   if(v.length>=3&&(' '+n+' ').includes(' '+v+' '))ranked.push({name,score:v.length});
  }
  ranked.sort((a,b)=>b.score-a.score);
- if(ranked.length)return {name:ranked[0].name,matched:true};
- const rx=/\b(?:en|chez|at|comercio|tienda|magasin)\s+([\p{L}\p{N}][\p{L}\p{N}\s.'&-]{1,60})/iu;
- const m=raw.match(rx);
- if(m){let value=m[1].split(/[,;.]|\b(?:bolsillo|pocket|desde|depuis|description|descripci[oó]n|nota|note|por|pour|de|con|avec|cost[oó]|cargad[oa]s?|pagad[oa]s?|pagu[eé]|paye|payé|importe|total|fueron|fue|euros?|relai|swile|amex)\b/iu)[0].replace(/[\s,.;]+$/,'').trim();if(value.length>=2)return{name:value,matched:false}}
+ if(ranked.length)return{name:ranked[0].name,matched:true};
+ // El dictado de iOS puede separar con comas las palabras de un comercio.
+ // «en tienda, ejemplo bolsillo, alimentación» => «tienda ejemplo».
+ const patterns=[
+  /\b(?:comercio|establecimiento)\b\s*(?:(?:es|fue|se\s+llama|se\s+llamaba|de|del|en)\s+)?(?:[:,\-]\s*)?([\p{L}\p{N}][\p{L}\p{N}\s,.'&/-]{0,90})/iu,
+  /\b(?:en|chez|at)\s+(?:(?:el|la|le|les)\s+)?([\p{L}\p{N}][\p{L}\p{N}\s,.'&/-]{0,90})/iu,
+  /\b(?:tienda|magasin)\s+(?:de\s+)?([\p{L}\p{N}][\p{L}\p{N}\s,.'&/-]{0,90})/iu
+ ];
+ const stop=/\b(?:(?:del?|para\s+el)\s+)?(?:bolsillo|pocket|categor[ií]a)\b|\b(?:desde|depuis|descripcion|description|nota|note|cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|pagad[oa]s?|pagu[eé]|pay[eé]|paid|importe|total|cuestan?|cost[oó]|gaste|gasto|euros?|swile|swail|suail|relais|relai|relay|amex|american\s+express)\b/iu;
+ const generic=new Set(['tienda','comercio','establecimiento','magasin','supermercado','restaurant','restaurante','el comercio','la tienda']);
+ for(const rx of patterns){
+   const m=raw.match(rx);if(!m)continue;
+   const value=m[1].split(stop)[0].split(/[.!?;\r\n]/)[0]
+      .replace(/^(?:(?:es|fue|se\s+llama|en|de|del|la|el)\s+)*/iu,'')
+      .replace(/[,:"“”«»]+/g,' ').replace(/\s+/g,' ').trim();
+   if(value.length>=2&&!generic.has(key(value))&&!/^\d+$/.test(value))return{name:value.slice(0,100),matched:false};
+ }
  return{name:'',matched:false};
 }
 function expandSpokenCents(text){

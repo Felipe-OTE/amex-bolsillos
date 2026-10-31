@@ -81,12 +81,12 @@ function merchantFor(raw,options){
  // El dictado de iOS puede separar con comas las palabras de un comercio.
  // «en tienda, ejemplo bolsillo, alimentación» => «tienda ejemplo».
  const patterns=[
-  /\b(?:comercio|establecimiento)\b\s*(?:(?:es|fue|se\s+llama|se\s+llamaba|de|del|en)\s+)?(?:[:,\-]\s*)?([\p{L}\p{N}][\p{L}\p{N}\s,.'&/-]{0,90})/iu,
+  /\b(?:comercio|commerce|commer[cç]ant|establecimiento)\b\s*(?:(?:es|est|fue|se\s+llama|se\s+llamaba|de|del|en)\s+)?(?:[:,\-]\s*)?([\p{L}\p{N}][\p{L}\p{N}\s,.'&/-]{0,90})/iu,
   /\b(?:en|chez|at)\s+(?:(?:el|la|le|les)\s+)?([\p{L}\p{N}][\p{L}\p{N}\s,.'&/-]{0,90})/iu,
   /\b(?:tienda|magasin)\s+(?:de\s+)?([\p{L}\p{N}][\p{L}\p{N}\s,.'&/-]{0,90})/iu
  ];
- const stop=/\b(?:(?:del?|para\s+el)\s+)?(?:bolsillo|pocket|categor[ií]a)\b|\b(?:desde|depuis|descripcion|description|nota|note|cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|pagad[oa]s?|pagu[eé]|pay[eé]|paid|importe|total|cuestan?|cost[oó]|gaste|gasto|euros?|swile|swail|suail|relais|relai|relay|amex|american\s+express)\b/iu;
- const generic=new Set(['tienda','comercio','establecimiento','magasin','supermercado','restaurant','restaurante','el comercio','la tienda']);
+ const stop=/\b(?:(?:del?|para\s+el)\s+)?(?:bolsillo|pocket|categor[ií]a|cat[eé]gorie|poches?|enveloppes?)\b|\b(?:alimentation|loisirs|impr[eé]vus?|imprevistos?)\b(?=\s*(?:(?:[,.;]\s*)?(?:motif|motivo|description|descripci[oó]n|note|nota)\b|$))|\b(?:desde|depuis|descripcion|description|motivo|motif|nota|note|cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|pagad[oa]s?|pagu[eé]|pay[eé]|paid|importe|total|cuestan?|cost[oó]|gaste|gasto|euros?|swile|swail|suail|relais|relai|relay|amex|american\s+express)\b/iu;
+ const generic=new Set(['tienda','comercio','commerce','commercant','commerçant','establecimiento','magasin','supermercado','restaurant','restaurante','el comercio','la tienda']);
  for(const rx of patterns){
    const m=raw.match(rx);if(!m)continue;
    const value=m[1].split(stop)[0].split(/[.!?;\r\n]/)[0]
@@ -103,7 +103,7 @@ function descriptionFor(raw){
  const m=String(raw||'').match(tag);
  if(!m)return '';
  let value=raw.slice(m.index+m[0].length).replace(/^[\s,;:.\-–—]+/u,'');
- const field=/\b(?:comercio|merchant|establecimiento|bolsillo|pocket|categor[ií]a|tipo\s+de\s+pago|origen\s+del\s+dinero|importe|monto|montant)\b/iu;
+ const field=/\b(?:comercio|commerce|commer[cç]ant|merchant|establecimiento|bolsillo|pocket|poches?|cat[eé]gorie|categor[ií]a|enveloppe|tipo\s+de\s+pago|origen\s+del\s+dinero|importe|monto|montant)\b/iu;
  value=value.split(field)[0].split(/[\r\n]/)[0].replace(/[\s,;:.\-–—]+$/u,'').trim();
  if(!value)return '';
  return value.charAt(0).toLocaleUpperCase('es')+value.slice(1,161);
@@ -167,7 +167,7 @@ function parse(text,opts={}){
  }
  if(!classified.length)warnings.push('No se encontró un importe en euros.');
  if(!hasRelais && hasSwile && !hasAmex)warnings.push('Swile sin Relais ni AMEX: confirma que exista un cargo a AMEX.');
- if(!hasRelais && !hasSwile && !hasAmex)warnings.push('Tipo de pago no indicado; revisa si fue AMEX directa.');
+ // AMEX directa es el valor predeterminado cuando no se menciona Swile.
  let amount=amex?amex.amount:null,swilePaid=swile?swile.amount:null,purchaseTotal=total?total.amount:null;
  if(amount!==null&&swilePaid!==null&&purchaseTotal===null)purchaseTotal=amount+swilePaid;
  if(amount!==null&&purchaseTotal!==null&&swilePaid===null && purchaseTotal>=amount && source==='Swile relais')swilePaid=purchaseTotal-amount;
@@ -181,9 +181,11 @@ function parse(text,opts={}){
   const k=key(p);if(k.length<3)return false;
   const aliases=[k];if(k.length>=6&&!k.endsWith('s'))aliases.push(k+'s');
   if(k.length>=6&&k.endsWith('s'))aliases.push(k.slice(0,-1));
+  if(k==='alimentacion')aliases.push('alimentation');
+  if(k==='imprevisto'||k==='imprevistos')aliases.push('imprevu','imprevus');
   return aliases.some(a=>(' '+normalized+' ').includes(' '+a+' '));
  }).sort((a,b)=>b.length-a.length);
- const pocketWasMentioned=/\b(?:bolsillo|pocket|cat[eé]gorie|categor[ií]a)\b/i.test(raw);
+ const pocketWasMentioned=/\b(?:bolsillo|pocket|poches?|cat[eé]gorie|categor[ií]a|enveloppe)\b/i.test(raw);
  let pocket=matches.length?matches[0]:'';
  // Si se dictó explícitamente «bolsillo» pero el reconocimiento fue incorrecto,
  // NO asignar otro bolsillo por la regla habitual del comercio.

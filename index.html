@@ -36,7 +36,7 @@
 <div class="voice-card" id="voiceCard"><h3>🎙 Registrar gasto por voz <span class="tiny">· prueba v1.3</span></h3>
 <p class="hint" style="margin:0 0 9px">Toca «Dictar» y usa el micrófono del teclado del iPhone. Habla en español o francés; podrás corregir el texto antes del análisis.</p>
 <div class="voice-notice"><strong>Entorno de prueba externo:</strong> utiliza únicamente datos ficticios. No importes respaldos ni movimientos financieros reales aquí.</div>
-<div class="field"><label for="voiceTranscript">Texto dictado</label><textarea id="voiceTranscript" rows="3" lang="es" autocomplete="off" autocorrect="on" placeholder="Ej.: 4 euros cargados con Swile Relais en Lidl, bolsillo Alimentación"></textarea></div>
+<div class="field"><label for="voiceTranscript">Texto dictado</label><textarea id="voiceTranscript" rows="3" lang="es" autocomplete="off" autocorrect="on" placeholder="Ej.: 4 euros cargados con Swile Relais en Tienda Ejemplo, bolsillo Alimentación"></textarea></div>
 <div class="btns voice-buttons"><button type="button" class="btn soft" id="voiceFocus">🎙 Dictar</button><button type="button" class="btn primary" id="voiceAnalyze">Interpretar gasto</button><button type="button" class="btn" id="voiceExample">Ejemplo ficticio</button></div>
 <div id="voiceMessage" class="tiny" style="margin-top:7px" role="status"></div>
 <div id="voiceReview" class="voice-review" hidden><h3 style="margin:0 0 8px">Revisa la interpretación</h3>
@@ -174,7 +174,7 @@
  $('nowBtn').addEventListener('click',resetDateToNow);
  $('voiceFocus').addEventListener('click',()=>{$('voiceTranscript').focus();showMsg('voiceMessage','Usa el micrófono del teclado del iPhone; después pulsa «Interpretar gasto».')});
  $('voiceAnalyze').addEventListener('click',analyzeVoice);
- $('voiceExample').addEventListener('click',()=>{$('voiceTranscript').value='4 euros cargados con Swile Relais en Lidl, bolsillo Alimentación';analyzeVoice()});
+ $('voiceExample').addEventListener('click',()=>{$('voiceTranscript').value='4 euros cargados con Swile Relais en Tienda Ejemplo, bolsillo Alimentación';analyzeVoice()});
  $('voiceApply').addEventListener('click',applyVoice);
  $('voiceDiscard').addEventListener('click',()=>{voiceDraft=null;$('voiceReview').hidden=true;showMsg('voiceMessage','Borrador descartado. No se guardó ningún movimiento.')});
  $('entryForm').addEventListener('submit',saveRecord);$('cancelEdit').addEventListener('click',clearForm);

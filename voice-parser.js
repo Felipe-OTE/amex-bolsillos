@@ -183,10 +183,13 @@ function parse(text,opts={}){
   if(k.length>=6&&k.endsWith('s'))aliases.push(k.slice(0,-1));
   return aliases.some(a=>(' '+normalized+' ').includes(' '+a+' '));
  }).sort((a,b)=>b.length-a.length);
+ const pocketWasMentioned=/\b(?:bolsillo|pocket|cat[eé]gorie|categor[ií]a)\b/i.test(raw);
  let pocket=matches.length?matches[0]:'';
- if(!pocket&&found.name&&opts.rules)pocket=opts.rules[key(found.name)]||'';
+ // Si se dictó explícitamente «bolsillo» pero el reconocimiento fue incorrecto,
+ // NO asignar otro bolsillo por la regla habitual del comercio.
+ if(!pocket&&!pocketWasMentioned&&found.name&&opts.rules)pocket=opts.rules[key(found.name)]||'';
  if(!found.name)warnings.push('No se identificó el comercio. Corrígelo antes de guardar.');
- if(!pocket&&/\b(?:bolsillo|pocket)\b/i.test(raw))warnings.push('Se mencionó un bolsillo, pero no se reconoció su nombre. Selecciónalo o cambia al teclado francés para «Loisirs».');
+ if(!pocket&&pocketWasMentioned)warnings.push('Se mencionó un bolsillo, pero no se reconoció su nombre. Selecciónalo o cambia al teclado francés para «Loisirs».');
  const description=descriptionFor(raw);
  const invalid=warnings.some(x=>/varios importes|varios totales|total no coincide|supera el total|no se identifico con certeza/i.test(key(x)));
  const canApply=!!found.name&&amount!==null&&amount>0&&!invalid;

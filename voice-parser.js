@@ -56,49 +56,80 @@ function merchantFor(raw,options){
  if(m){let value=m[1].split(/\b(?:por|pour|de|con|avec|cost[oó]|cargad[oa]s?|pagad[oa]s?|pagu[eé]|paye|payé|importe|total|fueron|fue|euros?|relai|swile|amex)\b/iu)[0].replace(/[\s,.;]+$/,'').trim();if(value.length>=2)return{name:value,matched:false}}
  return{name:'',matched:false};
 }
+function expandSpokenCents(text){
+ return text.replace(/\b(\d{1,4}|[\p{L}]+)\s+euros?\s+(?:(?:con|y|et|and)\s+)?(\d{1,2}|[\p{L}]+)(?=\s|[.,;!?]|$)/giu,(all,e,c)=>{
+  const whole=/^\d+$/.test(e)?Number(e):wordNumber(e),cent=/^\d+$/.test(c)?Number(c):wordNumber(c);
+  if(whole===null||cent===null||whole>9999||cent>99||!Number.isFinite(cent))return all;
+  return whole+','+String(cent).padStart(2,'0')+' euros';
+ });
+}
+function amountRole(v,prev,next,text,totalCount){
+ const b=norm(prev).slice(-100),a=norm(next).slice(0,110);
+ const near=(s,re)=>re.test(s);
+ const amtPaid=/\b(?:pago|pague|pag[oó]|pay[eé]|paid|cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|charg[eé]s?|charged?|resto|restante|remaining|debite|debito)\b/;
+ const totalBefore=/\b(?:total|compra|achat|factura|precio|prix|costo|cost[oó]|coste|salio|salió|valio|val[ií]a)\s*(?:fue|es|de|por|a|:|en|d un|d une|de la)?\s*$/;
+ const totalAfter=/^\s*(?:en\s+)?(?:total|en total|la compra|d achat|achat total)\b/;
+ const prevAmex=/\b(?:amex|a mex|am ecs|american express)\b[^,.]{0,34}$/;
+ const prevSwile=/\b(?:swile|swail|swaile|suail|swyle|souail|souaille|suile)\b[^,.]{0,34}$/;
+ const afterAmex=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:amex|american express|a mex|am ecs)\b/;
+ const afterSwile=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:swile|swail|suail|swyle|souail|suile)\b/;
+ const explicitSwile=afterSwile.test(a)||prevSwile.test(b);
+ const explicitAmex=afterAmex.test(a)||prevAmex.test(b);
+ const relayContext=RELAIS.test(a.slice(0,60))||RELAIS.test(b.slice(-60));
+ const charged=/\b(?:cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|charged?|charg[eé]s?|resto|restante|remaining)\b/;
+ const pay=/\b(?:pag[oó]|pagu[eé]|pay[eé]|paid|pago)\b/;
+ if(totalBefore.test(b)||totalAfter.test(a.slice(0,35))||/\b(?:compre|compr[eé]|achete|achet[eé])\s+(?:en\s+[\p{L}\s]+\s+)?por\s*$/.test(b))return'total';
+ if(explicitAmex)return 'amex';
+ if(explicitSwile && relayContext && (charged.test(b.slice(-50))||charged.test(a.slice(0,42))))return'amex';
+ if(explicitSwile && !relayContext)return'swile';
+ if(explicitSwile&&relayContext && pay.test(b.slice(-40)))return'swile';
+ if(explicitSwile&&relayContext)return totalCount===1?'uncertain':'swile';
+ if(relayContext && charged.test(b.slice(-55)) && totalCount===1)return'amex';
+ if(/\b(?:am[eé]x|american express)\b/.test(b.slice(-40)+a.slice(0,38)))return'amex';
+ return'unknown';
+}
 function parse(text,opts={}){
- const raw=String(text||'').trim();const s=norm(raw),warnings=[];
+ const raw=String(text||'').trim(),warnings=[];
+ if(!raw)return{amount:null,merchant:'',source:null,pocket:'',warnings:['Dicta o escribe los detalles de la compra.'],canApply:false,swilePaid:null,purchaseTotal:null,ambiguous:true};
+ const s=expandSpokenCents(norm(raw));
  const hasSwile=SWILE.test(s),hasRelais=RELAIS.test(s),hasAmex=AMEX.test(s);
  const source=hasRelais&&(hasSwile||hasAmex)||hasSwile&&hasAmex?'Swile relais':hasRelais?'Swile relais':hasSwile?null:'AMEX';
- if(!raw)return{amount:null,merchant:'',source:null,pocket:'',warnings:['Dicta o escribe los detalles de la compra.'],canApply:false,swilePaid:null,total:null,ambiguous:true};
- const values=amounts(raw);
- const candidate=[];for(let i=0;i<values.length;i++){
-   const v=values[i],before=norm(raw.slice(i?values[i-1].end:0,v.start)),after=norm(raw.slice(v.end,i+1<values.length?values[i+1].start:raw.length));
-   const beforeTail=before.slice(-72),afterHead=after.slice(0,72);
-   let role='unknown';
-   if(/\b(?:total|compra|achat|factura|prix|valor|cost[oó]|co[uû]t)\b/.test(beforeTail)&&!/\b(?:swile|amex)\b/.test(beforeTail.slice(-25)))role='total';
-   if(AMEX.test(afterHead.slice(0,45))||AMEX.test(beforeTail.slice(-35)))role='amex';
-   else if(SWILE.test(afterHead.slice(0,48))&&RELAIS.test(afterHead.slice(0,60))&&/\b(?:cargad|cobrad|debita|debit|charged?|charg|restant|resto|saldo|remaining)/.test(afterHead+beforeTail))role='amex';
-   else if(SWILE.test(afterHead.slice(0,45))||/\b(?:swile|swail|suail)\b/.test(beforeTail.slice(-35)))role=hasRelais && values.length===1 && /\b(?:cargad|cobrad|debita|debit|charged?|charg|restant|resto|saldo|remaining)/.test(afterHead+beforeTail)?'amex':'swile';
-   if(RELAIS.test(afterHead.slice(0,35)) && values.length===1 && /\b(?:cargad|cobrad|debita|debit|charged?|charg|restant|resto|saldo|remaining)/.test(afterHead+beforeTail))role='amex';
-   if(/(?:a|pour|to|en|sur)\s*$/.test(beforeTail)&&AMEX.test(afterHead.slice(0,20)))role='amex';
-   candidate.push({...v,role});
+ const values=amounts(s);
+ const classified=values.map((v,i)=>({...v,role:amountRole(v,s.slice(i?values[i-1].end:0,v.start),s.slice(v.end,i+1<values.length?values[i+1].start:s.length),s,values.length)}));
+ const group=role=>classified.filter(x=>x.role===role);
+ let amex=group('amex')[0]||null,swile=group('swile')[0]||null,total=group('total')[0]||null;
+ if(group('amex').length>1)warnings.push('Hay varios importes atribuidos a AMEX; revisa el desglose.');
+ if(group('swile').length>1)warnings.push('Hay varios importes atribuidos a Swile; revisa el desglose.');
+ if(group('total').length>1)warnings.push('Hay varios totales declarados; revisa el desglose.');
+ const unknown=group('unknown'), uncertain=group('uncertain');
+ if(!amex && !hasRelais&&!hasSwile&&classified.length===1)amex=classified[0];
+ if(!amex && hasRelais && total && swile && unknown.length===0 && uncertain.length===0 && total.amount>=swile.amount){
+    amex={amount:total.amount-swile.amount,derived:true};
  }
- let amex = candidate.find(v=>v.role==='amex'),swile =candidate.find(v=>v.role==='swile'),total=candidate.find(v=>v.role==='total');
- if(!amex&&candidate.length===1&&candidate[0].role==='unknown'&&!(hasSwile||hasRelais))amex=candidate[0];
- if(!amex&&candidate.length===1&&candidate[0].role==='unknown'&&(hasSwile||hasRelais))warnings.push('Indica explícitamente cuánto se cargó a AMEX; podría ser el total de la compra.');
- if(!amex&&candidate.length===1&&candidate[0].role==='swile'&&hasRelais)warnings.push('No está claro si ese importe es el total o solo la parte pagada con Swile.');
- if(!amex&&!swile&&!total&&candidate.length===1&&!hasSwile&&!hasRelais)amex=candidate[0];
- if(!amex&&candidate.length>1){const others=candidate.filter(v=>v!==swile&&v!==total);if(others.length===1 &&(hasAmex||hasRelais))amex=others[0]}
- if(candidate.length>1&&!amex)warnings.push('Hay varios importes; especifica el importe cargado a AMEX.');
- if(!candidate.length)warnings.push('No encontré un importe en euros.');
- if(hasSwile&&!hasRelais&&!hasAmex)warnings.push('Has mencionado Swile, pero no Relais ni AMEX. Confirma si hubo un cargo a AMEX.');
- if(!hasAmex&&!hasSwile&&!hasRelais)warnings.push('Tipo de pago no indicado: revisa si fue AMEX directa.');
+ if(!amex && hasRelais && total && !swile && classified.length===2 && unknown.length===1)amex=unknown[0];
+ if(!amex && hasRelais && swile && !total && classified.length===2 && unknown.length===1)amex=unknown[0];
+ if(!amex && (hasRelais||hasSwile)){
+   warnings.push('No se identificó con certeza cuánto se cargó a AMEX. Especifica «X euros cargados a AMEX por Swile Relais».');
+ }
+ if(!classified.length)warnings.push('No se encontró un importe en euros.');
+ if(!hasRelais && hasSwile && !hasAmex)warnings.push('Swile sin Relais ni AMEX: confirma que exista un cargo a AMEX.');
+ if(!hasRelais && !hasSwile && !hasAmex)warnings.push('Tipo de pago no indicado; revisa si fue AMEX directa.');
  let amount=amex?amex.amount:null,swilePaid=swile?swile.amount:null,purchaseTotal=total?total.amount:null;
  if(amount!==null&&swilePaid!==null&&purchaseTotal===null)purchaseTotal=amount+swilePaid;
- if(amount!==null&&purchaseTotal!==null&&swilePaid===null && purchaseTotal>=amount)swilePaid=purchaseTotal-amount;
- if(amount!==null&&purchaseTotal!==null&&purchaseTotal<amount)warnings.push('El cargo a AMEX supera el total declarado: comprueba los importes.');
+ if(amount!==null&&purchaseTotal!==null&&swilePaid===null && purchaseTotal>=amount && source==='Swile relais')swilePaid=purchaseTotal-amount;
+ if(amount!==null&&purchaseTotal!==null&&purchaseTotal<amount)warnings.push('El cargo a AMEX supera el total declarado.');
  if(amount!==null&&swilePaid!==null&&purchaseTotal!==null&&amount+swilePaid!==purchaseTotal)warnings.push('El total no coincide con la suma de Swile y AMEX.');
+ if(group('amex').length>1||group('swile').length>1||group('total').length>1)amount=null;
  if(hasSwile&&!hasRelais&&!hasAmex)amount=null;
  const found=merchantFor(raw,opts.merchants||[]);
- const pocketNames=opts.pockets||[],normalized=key(raw);let pocket='';
+ const pocketNames=opts.pockets||[],normalized=key(raw);
  const matches=pocketNames.filter(p=>{const k=key(p);return k.length>=3&&(' '+normalized+' ').includes(' '+k+' ')}).sort((a,b)=>b.length-a.length);
- if(matches.length)pocket=matches[0];
- else if(found.name && opts.rules && opts.rules[key(found.name)])pocket=opts.rules[key(found.name)];
+ let pocket=matches.length?matches[0]:'';
+ if(!pocket&&found.name&&opts.rules)pocket=opts.rules[key(found.name)]||'';
  if(!found.name)warnings.push('No se identificó el comercio. Corrígelo antes de guardar.');
- const effectiveSource=source||'AMEX';
- const okAmount=amount!==null&&amount>0&&!warnings.some(x=>x.startsWith('El cargo a AMEX supera')||x.startsWith('El total no coincide'));
- return {merchant:found.name,matchedMerchant:found.matched,amount,source:effectiveSource,pocket,swilePaid,purchaseTotal,warnings,canApply:!!found.name&&okAmount,ambiguous:!okAmount,transcript:raw};
+ const invalid=warnings.some(x=>/varios importes|varios totales|total no coincide|supera el total|no se identifico con certeza/i.test(key(x)));
+ const canApply=!!found.name&&amount!==null&&amount>0&&!invalid;
+ return {merchant:found.name,matchedMerchant:found.matched,amount,source:source||'AMEX',pocket,swilePaid,purchaseTotal,warnings,canApply,ambiguous:!canApply,transcript:raw};
 }
 root.AmexVoiceParser=Object.freeze({parse,version:'1.3'});
 })(window);

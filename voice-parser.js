@@ -78,7 +78,7 @@ function amountRole(v,prev,next,text,totalCount){
  const relayContext=RELAIS.test(a.slice(0,60))||RELAIS.test(b.slice(-60));
  const charged=/\b(?:cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|charged?|charg[eé]s?|resto|restante|remaining)\b/;
  const pay=/\b(?:pag[oó]|pagu[eé]|pay[eé]|paid|pago)\b/;
- if(totalBefore.test(b)||totalAfter.test(a.slice(0,35))||/\b(?:compre|compr[eé]|achete|achet[eé])\s+(?:en\s+[\p{L}\s]+\s+)?por\s*$/.test(b))return'total';
+ if(totalBefore.test(b)||(totalCount===1&&/^\s*por\s*$/.test(b))||totalAfter.test(a.slice(0,35))||/\b(?:compre|compr[eé]|achete|achet[eé])\s+(?:en\s+[\p{L}\s]+\s+)?por\s*$/.test(b))return'total';
  if(explicitAmex)return 'amex';
  if(explicitSwile && relayContext && (charged.test(b.slice(-50))||charged.test(a.slice(0,42))))return'amex';
  if(explicitSwile && !relayContext)return'swile';

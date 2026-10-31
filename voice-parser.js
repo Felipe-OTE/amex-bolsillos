@@ -96,6 +96,18 @@ function merchantFor(raw,options){
  }
  return{name:'',matched:false};
 }
+// El motivo se extrae solo si está introducido por una etiqueta explícita.
+// Evita convertir en una descripción cualquier fragmento indeterminado del dictado.
+function descriptionFor(raw){
+ const tag=/\b(?:motivo|motif|descripci[oó]n|description|nota|note|concepto|detalle)\b\s*(?:(?:de|del|de la|du|de l')\s*(?:compra|gasto|achat|paiement)\s*)?(?:(?:es|fue|est)\s*)?(?:[:;,.\-–—]\s*)?/iu;
+ const m=String(raw||'').match(tag);
+ if(!m)return '';
+ let value=raw.slice(m.index+m[0].length).replace(/^[\s,;:.\-–—]+/u,'');
+ const field=/\b(?:comercio|merchant|establecimiento|bolsillo|pocket|categor[ií]a|tipo\s+de\s+pago|origen\s+del\s+dinero|importe|monto|montant)\b/iu;
+ value=value.split(field)[0].split(/[\r\n]/)[0].replace(/[\s,;:.\-–—]+$/u,'').trim();
+ if(!value)return '';
+ return value.charAt(0).toLocaleUpperCase('es')+value.slice(1,161);
+}
 function expandSpokenCents(text){
  return text.replace(/\b(\d{1,4}|[\p{L}]+)\s+euros?\s+(?:(?:con|y|et|and)\s+)?(\d{1,2}|[\p{L}]+)(?!\s+euros?\b)(?=\s|[.,;!?]|$)/giu,(all,e,c)=>{
   const whole=/^\d+$/.test(e)?Number(e):wordNumber(e),cent=/^\d+$/.test(c)?Number(c):wordNumber(c);
@@ -130,7 +142,7 @@ function amountRole(v,prev,next,text,totalCount){
 }
 function parse(text,opts={}){
  const raw=String(text||'').trim(),warnings=[];
- if(!raw)return{amount:null,merchant:'',source:null,pocket:'',warnings:['Dicta o escribe los detalles de la compra.'],canApply:false,swilePaid:null,purchaseTotal:null,ambiguous:true};
+ if(!raw)return{amount:null,merchant:'',source:null,pocket:'',description:'',warnings:['Dicta o escribe los detalles de la compra.'],canApply:false,swilePaid:null,purchaseTotal:null,ambiguous:true};
  const s=expandSpokenCents(norm(raw));
  const hasSwile=SWILE.test(s),shortRelais=SWILE_SHORT_RELAIS.test(s),hasRelais=RELAIS.test(s)||shortRelais,hasAmex=AMEX.test(s);
  if(shortRelais&&!RELAIS.test(s))warnings.push('El dictado escribió «Swile Ré»: se interpreta como Swile Relais. Confirma el tipo de pago.');
@@ -174,9 +186,11 @@ function parse(text,opts={}){
  let pocket=matches.length?matches[0]:'';
  if(!pocket&&found.name&&opts.rules)pocket=opts.rules[key(found.name)]||'';
  if(!found.name)warnings.push('No se identificó el comercio. Corrígelo antes de guardar.');
+ if(!pocket&&/\b(?:bolsillo|pocket)\b/i.test(raw))warnings.push('Se mencionó un bolsillo, pero no se reconoció su nombre. Selecciónalo o cambia al teclado francés para «Loisirs».');
+ const description=descriptionFor(raw);
  const invalid=warnings.some(x=>/varios importes|varios totales|total no coincide|supera el total|no se identifico con certeza/i.test(key(x)));
  const canApply=!!found.name&&amount!==null&&amount>0&&!invalid;
- return {merchant:found.name,matchedMerchant:found.matched,amount,source:source||'AMEX',pocket,swilePaid,purchaseTotal,warnings,canApply,ambiguous:!canApply,transcript:raw};
+ return {merchant:found.name,matchedMerchant:found.matched,amount,source:source||'AMEX',pocket,description,swilePaid,purchaseTotal,warnings,canApply,ambiguous:!canApply,transcript:raw};
 }
 root.AmexVoiceParser=Object.freeze({parse,version:'1.3'});
 })(window);

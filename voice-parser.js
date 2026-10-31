@@ -57,7 +57,7 @@ function merchantFor(raw,options){
  return{name:'',matched:false};
 }
 function expandSpokenCents(text){
- return text.replace(/\b(\d{1,4}|[\p{L}]+)\s+euros?\s+(?:(?:con|y|et|and)\s+)?(\d{1,2}|[\p{L}]+)(?=\s|[.,;!?]|$)/giu,(all,e,c)=>{
+ return text.replace(/\b(\d{1,4}|[\p{L}]+)\s+euros?\s+(?:(?:con|y|et|and)\s+)?(\d{1,2}|[\p{L}]+)(?!\s+euros?\b)(?=\s|[.,;!?]|$)/giu,(all,e,c)=>{
   const whole=/^\d+$/.test(e)?Number(e):wordNumber(e),cent=/^\d+$/.test(c)?Number(c):wordNumber(c);
   if(whole===null||cent===null||whole>9999||cent>99||!Number.isFinite(cent))return all;
   return whole+','+String(cent).padStart(2,'0')+' euros';

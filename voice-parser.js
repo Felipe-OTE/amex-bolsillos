@@ -25,8 +25,20 @@ function wordNumber(source){
 function parseAmount(raw){let s=String(raw||'').replace(/\s/g,'').replace(',','.');const n=Number(s);return Number.isFinite(n)&&n>=0&&n<100000?Math.round(n*100):null}
 function amounts(text){
  const found=[], used=[];
+ const add=(start,end,literal,rawAmount)=>{
+   const cents=parseAmount(rawAmount);
+   if(cents===null||used.some(([a,b])=>start<b&&end>a))return;
+   found.push({start,end,amount:cents,literal});used.push([start,end]);
+ };
+ // El dictado de iOS puede escribir «ocho euros con veintitrés centavos» como «€8.23».
+ // Admite € o EUR delante, con coma o punto decimal (pero nunca 823 € por inferencia).
+ const prefixed=/(?:€|eur\b)\s*(\d{1,5}(?:[.,]\d{1,2})?)/giu;
+ for(const m of text.matchAll(prefixed))add(m.index,m.index+m[0].length,m[0],m[1]);
  const numeric=/\b(\d{1,5}(?:[.,]\d{1,2})?)\s*(?:€|euros?\b|eur\b)/giu;
- for(const m of text.matchAll(numeric)){const cents=parseAmount(m[1]);if(cents!==null){found.push({start:m.index,end:m.index+m[0].length,amount:cents,literal:m[0]});used.push([m.index,m.index+m[0].length])}}
+ for(const m of text.matchAll(numeric))add(m.index,m.index+m[0].length,m[0],m[1]);
+ // El teclado también puede omitir € al transcribir una cantidad decimal explícita.
+ const chargedDecimal=/\b(\d{1,5}[.,]\d{1,2})\b(?=\s+(?:cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|pagad[oa]s?|charged?|charg[eé]s?|paid)\b)/giu;
+ for(const m of text.matchAll(chargedDecimal))add(m.index,m.index+m[0].length,m[0],m[1]);
  const words=/([\p{L}]+(?:[\s'-]+[\p{L}]+){0,6})\s+euros?\b/giu;
  for(const m of text.matchAll(words)){
    const tokens=norm(m[1]).replace(/-/g,' ').split(/\s+/);let number=null,count=0;

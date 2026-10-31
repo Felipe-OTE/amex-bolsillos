@@ -70,9 +70,9 @@ function amountRole(v,prev,next,text,totalCount){
  const totalBefore=/\b(?:total|compra|achat|factura|precio|prix|costo|cost[oó]|coste|salio|salió|valio|val[ií]a)\s*(?:fue|es|de|por|a|:|en|d un|d une|de la)?\s*$/;
  const totalAfter=/^\s*(?:en\s+)?(?:total|en total|la compra|d achat|achat total)\b/;
  const prevAmex=/\b(?:amex|ameks|amecs|a mex|am ecs|am eks|american express)\b[^,.]{0,34}$/;
- const prevSwile=/\b(?:swile|swail|swaile|suail|swyle|souail|souaille|suile|smile)\b[^,.]{0,34}$/;
+ const prevSwile=/\b(?:swile|swail|swaile|swaille|swayle|suail|swyle|souail|souaille|suile|smile)\b[^,.]{0,34}$/;
  const afterAmex=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:amex|ameks|amecs|american express|a mex|am ecs|am eks)\b/;
- const afterSwile=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:swile|swail|swaile|suail|swyle|souail|suile|smile)\b/;
+ const afterSwile=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:swile|swail|swaile|swaille|swayle|suail|swyle|souail|suile|smile)\b/;
  const explicitSwile=afterSwile.test(a)||prevSwile.test(b);
  const explicitAmex=afterAmex.test(a)||prevAmex.test(b);
  const relayContext=RELAIS.test(a.slice(0,60))||RELAIS.test(b.slice(-60));

@@ -25,10 +25,12 @@ function wordNumber(source){
 function parseAmount(raw){let s=String(raw||'').replace(/\s/g,'').replace(',','.');const n=Number(s);return Number.isFinite(n)&&n>=0&&n<100000?Math.round(n*100):null}
 function amounts(text){
  const found=[], used=[];
- const add=(start,end,literal,rawAmount)=>{
+ const hasExpenseContext=/(?:\b(?:cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|pagad[oa]s?|charged?|charg[eé]s?|paid|swile|swail|amex|relay|relais|relai|comercio|bolsillo|compra|gasto|gast[eé]|pagu[eé]|pago)\b|€)/iu.test(text);
+ const addressNumbers=/\b(?:calle|carrera|avenida|av\.?|rue|numero|n[uú]mero|nº|n°)\s+\d{1,5}\s+(?:con|y|et)\s+\d{1,4}\b/iu;
+ const add=(start,end,literal,rawAmount,assumedEuros=false)=>{
    const cents=parseAmount(rawAmount);
    if(cents===null||used.some(([a,b])=>start<b&&end>a))return;
-   found.push({start,end,amount:cents,literal});used.push([start,end]);
+   found.push({start,end,amount:cents,literal,assumedEuros});used.push([start,end]);
  };
  // El dictado de iOS puede escribir «ocho euros con veintitrés centavos» como «€8.23».
  // Admite € o EUR delante, con coma o punto decimal (pero nunca 823 € por inferencia).
@@ -38,7 +40,20 @@ function amounts(text){
  for(const m of text.matchAll(numeric))add(m.index,m.index+m[0].length,m[0],m[1]);
  // El teclado también puede omitir € al transcribir una cantidad decimal explícita.
  const chargedDecimal=/\b(\d{1,5}[.,]\d{1,2})\b(?=\s+(?:cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|pagad[oa]s?|charged?|charg[eé]s?|paid)\b)/giu;
- for(const m of text.matchAll(chargedDecimal))add(m.index,m.index+m[0].length,m[0],m[1]);
+ for(const m of text.matchAll(chargedDecimal))add(m.index,m.index+m[0].length,m[0],m[1],true);
+ // Una frase como «73 con 27 cargados con Swile Relais» significa 73,27 €
+ // si hay contexto monetario; en cambio, no interpretamos una dirección como importe.
+ const spokenDecimal=/\b(\d{1,5})\s+(?:con|coma|punto|virgule)\s+(\d{1,2})\b/giu;
+ if(hasExpenseContext)for(const m of text.matchAll(spokenDecimal)){
+   if(Number(m[2])>99)continue;
+   if(addressNumbers.test(text)&&addressNumbers.test(text.slice(Math.max(0,m.index-30),m.index+m[0].length)))continue;
+   add(m.index,m.index+m[0].length,m[0],m[1]+'.'+m[2].padStart(2,'0'),true);
+ }
+ // iOS también puede escribir decimales sin símbolo monetario.
+ const bareDecimal=/\b(\d{1,5}[.,]\d{1,2})\b/giu;
+ if(hasExpenseContext)for(const m of text.matchAll(bareDecimal))add(m.index,m.index+m[0].length,m[0],m[1],true);
+ const chargedInteger=/\b(\d{1,5})\b(?=\s+(?:cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|charged?|charg[eé]s?)\b)/giu;
+ if(hasExpenseContext)for(const m of text.matchAll(chargedInteger))add(m.index,m.index+m[0].length,m[0],m[1],true);
  const words=/([\p{L}]+(?:[\s'-]+[\p{L}]+){0,6})\s+euros?\b/giu;
  for(const m of text.matchAll(words)){
    const tokens=norm(m[1]).replace(/-/g,' ').split(/\s+/);let number=null,count=0;
@@ -49,7 +64,7 @@ function amounts(text){
    if(used.some(([a,b])=>start<b&&end>a))continue;
    found.push({start,end,amount:number*100,literal:m[0]});
  }
- if(!found.length){const stand=/\b(?:por|de|a|con|pague|pago|pagué|paye|paid|cargados?|cobrado)\s+(\d{1,5}(?:[.,]\d{1,2})?)\b/giu;
+ if(!found.length&&hasExpenseContext){const stand=/\b(?:por|de|a|pague|pago|pagué|paye|paid|cargados?|cobrado)\s+(\d{1,5}(?:[.,]\d{1,2})?)\b/giu;
    for(const m of text.matchAll(stand)){const cents=parseAmount(m[1]);if(cents!==null)found.push({start:m.index,end:m.index+m[0].length,amount:cents,literal:m[0]})}
  }
  return found.sort((a,b)=>a.start-b.start);
@@ -109,7 +124,7 @@ function amountRole(v,prev,next,text,totalCount){
  if(explicitSwile && !relayContext)return'swile';
  if(explicitSwile&&relayContext && pay.test(b.slice(-40)))return'swile';
  if(explicitSwile&&relayContext)return totalCount===1?'uncertain':'swile';
- if(relayContext && charged.test(b.slice(-55)) && totalCount===1)return'amex';
+ if(relayContext && (charged.test(b.slice(-55))||charged.test(a.slice(0,60))) && totalCount===1)return'amex';
  if(/\b(?:am[eé]x|ameks|amecs|american express)\b/.test(b.slice(-40)+a.slice(0,38)))return'amex';
  return'unknown';
 }
@@ -122,6 +137,7 @@ function parse(text,opts={}){
  const source=hasRelais&&(hasSwile||hasAmex)||hasSwile&&hasAmex?'Swile relais':hasRelais?'Swile relais':hasSwile?null:'AMEX';
  const values=amounts(s);
  const classified=values.map((v,i)=>({...v,role:amountRole(v,s.slice(i?values[i-1].end:0,v.start),s.slice(v.end,i+1<values.length?values[i+1].start:s.length),s,values.length)}));
+ if(values.some(v=>v.assumedEuros))warnings.push('Moneda no pronunciada: se interpreta en euros. Confirma el importe.');
  const group=role=>classified.filter(x=>x.role===role);
  let amex=group('amex')[0]||null,swile=group('swile')[0]||null,total=group('total')[0]||null;
  if(group('amex').length>1)warnings.push('Hay varios importes atribuidos a AMEX; revisa el desglose.');
@@ -149,7 +165,12 @@ function parse(text,opts={}){
  if(hasSwile&&!hasRelais&&!hasAmex)amount=null;
  const found=merchantFor(raw,opts.merchants||[]);
  const pocketNames=opts.pockets||[],normalized=key(raw);
- const matches=pocketNames.filter(p=>{const k=key(p);return k.length>=3&&(' '+normalized+' ').includes(' '+k+' ')}).sort((a,b)=>b.length-a.length);
+ const matches=pocketNames.filter(p=>{
+  const k=key(p);if(k.length<3)return false;
+  const aliases=[k];if(k.length>=6&&!k.endsWith('s'))aliases.push(k+'s');
+  if(k.length>=6&&k.endsWith('s'))aliases.push(k.slice(0,-1));
+  return aliases.some(a=>(' '+normalized+' ').includes(' '+a+' '));
+ }).sort((a,b)=>b.length-a.length);
  let pocket=matches.length?matches[0]:'';
  if(!pocket&&found.name&&opts.rules)pocket=opts.rules[key(found.name)]||'';
  if(!found.name)warnings.push('No se identificó el comercio. Corrígelo antes de guardar.');

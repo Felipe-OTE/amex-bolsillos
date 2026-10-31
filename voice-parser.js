@@ -6,9 +6,9 @@
 'use strict';
 const norm = s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[’']/g,' ').replace(/\s+/g,' ').trim();
 const key = s=>norm(s).replace(/[^a-z0-9]+/g,' ').trim();
-const SWILE = /\b(?:swile|swail|swaile|suail|suayl|suail|swyle|souail|souaille|souaile|suil|suile|swile)\b/i;
+const SWILE = /\b(?:swile|swail|swaile|swaille|swayle|suail|suayl|swyle|souail|souaille|souaile|suil|suile|smile)\b/i;
 const RELAIS = /\b(?:relais|relai|relay|reley|relei|rele|reles|relays|releys|relais)\b/i;
-const AMEX = /\b(?:amex|am[\s-]?ex|am[\s-]?ecs|a[\s-]?mex|a[\s-]?mecs|american[\s-]+(?:express|xpress))\b/i;
+const AMEX = /\b(?:amex|ameks|amecs|am[\s-]?(?:ex|eks|ecs)|a[\s-]?(?:mex|mecs)|american[\s-]+(?:express|xpress))\b/i;
 const UNIT = {cero:0,uno:1,una:1,un:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20,veintiuno:21,veintidos:22,veintitres:23,veinticuatro:24,veinticinco:25,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90,zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,six:6,sept:7,huit:8,neuf:9,dix:10,onze:11,douze:12,treize:13,quatorze:14,quinze:15,seize:16,vingt:20,trente:30,quarante:40,cinquante:50,soixante:60};
 function wordNumber(source){
  let s=key(source);if(!s)return null;
@@ -69,10 +69,10 @@ function amountRole(v,prev,next,text,totalCount){
  const amtPaid=/\b(?:pago|pague|pag[oó]|pay[eé]|paid|cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|charg[eé]s?|charged?|resto|restante|remaining|debite|debito)\b/;
  const totalBefore=/\b(?:total|compra|achat|factura|precio|prix|costo|cost[oó]|coste|salio|salió|valio|val[ií]a)\s*(?:fue|es|de|por|a|:|en|d un|d une|de la)?\s*$/;
  const totalAfter=/^\s*(?:en\s+)?(?:total|en total|la compra|d achat|achat total)\b/;
- const prevAmex=/\b(?:amex|a mex|am ecs|american express)\b[^,.]{0,34}$/;
- const prevSwile=/\b(?:swile|swail|swaile|suail|swyle|souail|souaille|suile)\b[^,.]{0,34}$/;
- const afterAmex=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:amex|american express|a mex|am ecs)\b/;
- const afterSwile=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:swile|swail|suail|swyle|souail|suile)\b/;
+ const prevAmex=/\b(?:amex|ameks|amecs|a mex|am ecs|am eks|american express)\b[^,.]{0,34}$/;
+ const prevSwile=/\b(?:swile|swail|swaile|suail|swyle|souail|souaille|suile|smile)\b[^,.]{0,34}$/;
+ const afterAmex=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:amex|ameks|amecs|american express|a mex|am ecs|am eks)\b/;
+ const afterSwile=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:swile|swail|swaile|suail|swyle|souail|suile|smile)\b/;
  const explicitSwile=afterSwile.test(a)||prevSwile.test(b);
  const explicitAmex=afterAmex.test(a)||prevAmex.test(b);
  const relayContext=RELAIS.test(a.slice(0,60))||RELAIS.test(b.slice(-60));
@@ -85,7 +85,7 @@ function amountRole(v,prev,next,text,totalCount){
  if(explicitSwile&&relayContext && pay.test(b.slice(-40)))return'swile';
  if(explicitSwile&&relayContext)return totalCount===1?'uncertain':'swile';
  if(relayContext && charged.test(b.slice(-55)) && totalCount===1)return'amex';
- if(/\b(?:am[eé]x|american express)\b/.test(b.slice(-40)+a.slice(0,38)))return'amex';
+ if(/\b(?:am[eé]x|ameks|amecs|american express)\b/.test(b.slice(-40)+a.slice(0,38)))return'amex';
  return'unknown';
 }
 function parse(text,opts={}){

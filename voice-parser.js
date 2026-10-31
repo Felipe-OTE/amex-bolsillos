@@ -8,6 +8,9 @@ const norm = s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').to
 const key = s=>norm(s).replace(/[^a-z0-9]+/g,' ').trim();
 const SWILE = /\b(?:swile|swail|swaile|swaille|swayle|suail|suayl|swyle|souail|souaille|souaile|suil|suile|smile)\b/i;
 const RELAIS = /\b(?:relais|relai|relay|reley|relei|rele|reles|relays|releys|relais)\b/i;
+// Algunas transcripciones de iOS cortan «Relais» a «Ré» o «Ray».
+// Solo consideramos esas sílabas si aparecen inmediatamente después de Swile.
+const SWILE_SHORT_RELAIS = /\b(?:swile|swail|swaile|swaille|swayle|suail|suayl|swyle|souail|souaille|souaile|suil|suile|smile)\s*[,.:;\-]?\s*(?:re|ré|ray)\b/i;
 const AMEX = /\b(?:amex|ameks|amecs|am[\s-]?(?:ex|eks|ecs)|a[\s-]?(?:mex|mecs)|american[\s-]+(?:express|xpress))\b/i;
 const UNIT = {cero:0,uno:1,una:1,un:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20,veintiuno:21,veintidos:22,veintitres:23,veinticuatro:24,veinticinco:25,veintiseis:26,veintisiete:27,veintiocho:28,veintinueve:29,treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90,zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,un:1,une:1,deux:2,trois:3,quatre:4,cinq:5,six:6,sept:7,huit:8,neuf:9,dix:10,onze:11,douze:12,treize:13,quatorze:14,quinze:15,seize:16,vingt:20,trente:30,quarante:40,cinquante:50,soixante:60};
 function wordNumber(source){
@@ -85,7 +88,7 @@ function amountRole(v,prev,next,text,totalCount){
  const afterSwile=/^\s*(?:[\w\s]{0,24}?\b)?(?:a|con|en|sur|par|por|avec|to|via|al|de)\s+(?:la\s+)?(?:swile|swail|swaile|swaille|swayle|suail|swyle|souail|suile|smile)\b/;
  const explicitSwile=afterSwile.test(a)||prevSwile.test(b);
  const explicitAmex=afterAmex.test(a)||prevAmex.test(b);
- const relayContext=RELAIS.test(a.slice(0,60))||RELAIS.test(b.slice(-60));
+ const relayContext=RELAIS.test(a.slice(0,60))||RELAIS.test(b.slice(-60))||SWILE_SHORT_RELAIS.test(text);
  const charged=/\b(?:cargad[oa]s?|cobrad[oa]s?|debitad[oa]s?|charged?|charg[eé]s?|resto|restante|remaining)\b/;
  const pay=/\b(?:pag[oó]|pagu[eé]|pay[eé]|paid|pago)\b/;
  if(totalBefore.test(b)||(totalCount===1&&/^\s*por\s*$/.test(b))||totalAfter.test(a.slice(0,35))||/\b(?:compre|compr[eé]|achete|achet[eé])\s+(?:en\s+[\p{L}\s]+\s+)?por\s*$/.test(b))return'total';
@@ -102,7 +105,8 @@ function parse(text,opts={}){
  const raw=String(text||'').trim(),warnings=[];
  if(!raw)return{amount:null,merchant:'',source:null,pocket:'',warnings:['Dicta o escribe los detalles de la compra.'],canApply:false,swilePaid:null,purchaseTotal:null,ambiguous:true};
  const s=expandSpokenCents(norm(raw));
- const hasSwile=SWILE.test(s),hasRelais=RELAIS.test(s),hasAmex=AMEX.test(s);
+ const hasSwile=SWILE.test(s),shortRelais=SWILE_SHORT_RELAIS.test(s),hasRelais=RELAIS.test(s)||shortRelais,hasAmex=AMEX.test(s);
+ if(shortRelais&&!RELAIS.test(s))warnings.push('El dictado escribió «Swile Ré»: se interpreta como Swile Relais. Confirma el tipo de pago.');
  const source=hasRelais&&(hasSwile||hasAmex)||hasSwile&&hasAmex?'Swile relais':hasRelais?'Swile relais':hasSwile?null:'AMEX';
  const values=amounts(s);
  const classified=values.map((v,i)=>({...v,role:amountRole(v,s.slice(i?values[i-1].end:0,v.start),s.slice(v.end,i+1<values.length?values[i+1].start:s.length),s,values.length)}));
